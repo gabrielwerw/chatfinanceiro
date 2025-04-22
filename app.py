@@ -7,12 +7,13 @@ import unidecode
 app = Flask(__name__)
 
 # Leitura dos arquivos
-faturamento = pd.read_excel("Faturamento.xlsx")
-custo = pd.read_excel("Custo.xlsx")
-compras = pd.read_excel("Compras.xlsx")
-aso = pd.read_excel("ASO.xlsx")
-funcionarios = pd.read_excel("Funcionarios.xlsx")
-contratos = pd.read_excel("Contratos.xlsx")
+faturamento = pd.read_excel("data/Faturamento.xlsx")
+custo = pd.read_excel("data/Custo.xlsx")
+compras = pd.read_excel("data/Compras.xlsx")
+aso = pd.read_excel("data/ASO.xlsx")
+funcionarios = pd.read_excel("data/Funcionarios.xlsx")
+contratos = pd.read_excel("data/Contratos.xlsx")
+
 
 # Função para extrair mês da pergunta
 def extrair_mes(texto):
