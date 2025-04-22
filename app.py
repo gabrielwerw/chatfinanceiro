@@ -1,6 +1,5 @@
 
 from flask import Flask, render_template, request
-from pyngrok import ngrok
 import pandas as pd
 from datetime import datetime
 import unidecode
@@ -78,6 +77,4 @@ def index():
     return render_template("index.html", pergunta=pergunta, resposta=resposta)
 
 if __name__ == "__main__":
-    public_url = ngrok.connect(5000).public_url
-    print("🔗 Acesse via:", public_url)
     app.run(host="0.0.0.0", port=5000)
