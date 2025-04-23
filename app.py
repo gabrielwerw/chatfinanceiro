@@ -95,5 +95,7 @@ def perguntar():
     resposta = responder(pergunta)
     return jsonify({"resposta": resposta})
 
+
 if __name__ == "__main__":
-    app.run(debug=True)  # No Render, isso será alterado automaticamente
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
