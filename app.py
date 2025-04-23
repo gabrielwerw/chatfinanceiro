@@ -1,81 +1,99 @@
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import pandas as pd
 from datetime import datetime
 import unidecode
+import os
 
 app = Flask(__name__)
 
 # Leitura dos arquivos
-faturamento = pd.read_excel("data/Faturamento.xlsx")
-custo = pd.read_excel("data/Custo.xlsx")
-compras = pd.read_excel("data/Compras.xlsx")
-aso = pd.read_excel("data/ASO.xlsx")
-funcionarios = pd.read_excel("data/Funcionarios.xlsx")
-contratos = pd.read_excel("data/Contratos.xlsx")
+base_path = os.path.join("data")
+faturamento = pd.read_excel(os.path.join(base_path, "Faturamento.xlsx"))
+custo = pd.read_excel(os.path.join(base_path, "Custo.xlsx"))
+compras = pd.read_excel(os.path.join(base_path, "Compras.xlsx"))
+aso = pd.read_excel(os.path.join(base_path, "ASO.xlsx"))
+funcionarios = pd.read_excel(os.path.join(base_path, "Funcionarios.xlsx"))
+contratos = pd.read_excel(os.path.join(base_path, "Contratos.xlsx"))
 
+# Normalizar texto
+def normalizar(texto):
+    return unidecode.unidecode(texto.lower())
 
-# Função para extrair mês da pergunta
+# Extrair mês da pergunta
 def extrair_mes(texto):
-    meses = [
-        "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-        "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
-    ]
-    texto = unidecode.unidecode(texto.lower())
-    for mes in meses:
-        if mes in texto:
-            return mes.capitalize()
+    meses = {
+        "janeiro": "Janeiro", "fevereiro": "Fevereiro", "marco": "Março",
+        "abril": "Abril", "maio": "Maio", "junho": "Junho",
+        "julho": "Julho", "agosto": "Agosto", "setembro": "Setembro",
+        "outubro": "Outubro", "novembro": "Novembro", "dezembro": "Dezembro"
+    }
+    texto = normalizar(texto)
+    for chave, valor in meses.items():
+        if chave in texto:
+            return valor
     return None
 
+# Função de resposta
 def responder(pergunta):
-    pergunta = pergunta.lower()
+    pergunta_norm = normalizar(pergunta)
     mes = extrair_mes(pergunta)
 
-    if "faturamento" in pergunta:
+    if "faturamento" in pergunta_norm:
         if mes:
-            linha = faturamento[faturamento["Data"].str.lower().str.contains(mes.lower())]
-            if not linha.empty:
-                valor = linha["Valor"].sum()
-                return f"O faturamento de {mes} foi R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            valor = faturamento.loc[faturamento['Data'] == mes, 'Valor'].sum()
+            historico = faturamento.to_dict(orient="records")
+            return f"Faturamento de {mes}: R$ {valor:,.2f}" + "<br><br><b>Histórico:</b><br>" + "<br>".join([f"{x['Data']}: R$ {x['Valor']:,.2f}" for x in historico])
         else:
-            total = faturamento["Valor"].sum()
-            return f"O faturamento total é R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            total = faturamento['Valor'].sum()
+            return f"Faturamento total: R$ {total:,.2f}"
 
-    elif "compra" in pergunta:
-        compras["Data"] = compras["Data"].str.replace("fereveiro", "fevereiro", case=False)
+    if "compras" in pergunta_norm:
         if mes:
-            linha = compras[compras["Data"].str.lower().str.contains(mes.lower())]
-            if not linha.empty:
-                valor = linha["Valor"].sum()
-                return f"O total de compras em {mes} foi R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            valor = compras.loc[compras['Data'].str.contains(mes, case=False, na=False), 'Valor'].sum()
+            historico = compras.to_dict(orient="records")
+            return f"Compras de {mes}: R$ {valor:,.2f}" + "<br><br><b>Histórico:</b><br>" + "<br>".join([f"{x['Data']}: R$ {x['Valor']:,.2f}" for x in historico])
         else:
-            total = compras["Valor"].sum()
-            return f"O total de compras é R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            total = compras['Valor'].sum()
+            return f"Total de compras: R$ {total:,.2f}"
 
-    elif "aso" in pergunta:
-        aso["Data de Vencimento"] = pd.to_datetime(aso["Data de Vencimento"])
-        hoje = pd.to_datetime("today")
-        vencendo = aso[aso["Data de Vencimento"] < hoje]
-        return f"Quantidade de ASOs vencidos: {len(vencendo)}."
+    if "funcionario" in pergunta_norm:
+        total = len(funcionarios)
+        return f"Total de funcionários: {total}"
 
-    elif "contrato" in pergunta:
-        if "Valor Contrato" in contratos.columns:
-            total = contratos["Valor Contrato"].sum()
-            return f"O valor total dos contratos é R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    if "aso" in pergunta_norm:
+        vencendo = aso[aso['Data de Vencimento'] < datetime.now().strftime('%Y-%m-%d')]
+        return f"Total de ASOs vencidos: {len(vencendo)}"
+
+    if "custo" in pergunta_norm:
+        if mes:
+            valor = custo.loc[custo['Mes'].str.contains(mes, case=False, na=False), 'Custo'].sum()
+            return f"Custo de {mes}: R$ {valor:,.2f}"
         else:
-            return f"O total de contratos é {len(contratos)}."
+            total = custo['Custo'].sum()
+            return f"Custo total: R$ {total:,.2f}"
 
-    else:
-        return "Desculpe, não entendi. Tente perguntar sobre faturamento, compras, ASOs ou contratos."
+    if "contrato" in pergunta_norm:
+        if mes:
+            contratos['Mes'] = pd.to_datetime(contratos['Valor do Contrato']).dt.strftime('%B')
+            contratos['Mes'] = contratos['Mes'].str.capitalize()
+            valor = contratos.loc[contratos['Mes'] == mes, 'Valor Contrato'].sum()
+            return f"Total de contratos em {mes}: R$ {valor:,.2f}"
+        else:
+            total = contratos['Valor Contrato'].sum()
+            return f"Valor total dos contratos: R$ {total:,.2f}"
 
-@app.route("/", methods=["GET", "POST"])
+    return "Não entendi sua pergunta. Tente novamente com termos como 'faturamento', 'compras', 'ASOs', 'funcionários', 'contratos' ou 'custo'."
+
+@app.route("/")
 def index():
-    resposta = ""
-    pergunta = ""
-    if request.method == "POST":
-        pergunta = request.form["pergunta"]
-        resposta = responder(pergunta)
-    return render_template("index.html", pergunta=pergunta, resposta=resposta)
+    return render_template("index.html")
+
+@app.route("/perguntar", methods=["POST"])
+def perguntar():
+    pergunta = request.form.get("mensagem")
+    resposta = responder(pergunta)
+    return jsonify({"resposta": resposta})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True)  # No Render, isso será alterado automaticamente
